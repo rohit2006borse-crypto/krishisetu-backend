@@ -1,8 +1,7 @@
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config
+import asyncio
 from sqlalchemy import pool
 from alembic import context
-import asyncio
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -11,20 +10,27 @@ config = context.config
 # Interpret the config file for Python logging.
 fileConfig(config.config_file_name)
 
-import os
 from app.database import Base, engine
 from app.config import settings
 
+# add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
 
 
 def run_migrations_online():
-    connectable = engine.sync_engine  # use sync engine for alembic operations if configured
+    """Run migrations in 'online' mode for async engine."""
+    connectable = engine
 
-    with connectable.connect() as connection:
+    async def do_run():
+        async with connectable.connect() as connection:
+            await connection.run_sync(run_migrations)
+
+    def run_migrations(connection):
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
         with context.begin_transaction():
             context.run_migrations()
+
+    asyncio.run(do_run())
 
 
 if context.is_offline_mode():
